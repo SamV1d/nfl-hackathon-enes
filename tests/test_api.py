@@ -194,3 +194,10 @@ def test_real_data_reference_values():
     assert [(p["name"], p["count"]) for p in f["top_sackers"][:3]] == [
         ("Myles Garrett", 12), ("Trey Hendrickson", 10), ("Matt Judon", 9)]
     assert len(c.get("/api/games").json()) == 122
+
+def test_model_audit_endpoint_degrades_gracefully_on_synthetic_data(client):
+    r = client.get("/api/model-audit")
+    assert r.status_code in (200, 503)
+    if r.status_code == 503:
+        assert r.json()["detail"] == "model audit unavailable"
+    assert client.get("/api/model-audit").status_code == r.status_code  # el fallo no se reintenta en bucle

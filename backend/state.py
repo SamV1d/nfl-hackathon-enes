@@ -16,6 +16,7 @@ from .cleaning import clean_plays, train_median_defenders_in_box
 from .dataset import build_play_dataset
 from .linreg import split_indices
 from .loader import read_all
+from .ml.service import AuditCache
 from .models import PressureModel, YardsModel, fit_models
 from .recommender import CandidateCall, Recommendation, candidate_calls
 
@@ -43,6 +44,8 @@ class AppState:
     teams: list[str]
     recommendations: "OrderedDict[str, Recommendation]" = field(default_factory=OrderedDict)
     lock: threading.Lock = field(default_factory=threading.Lock)
+    plays: pd.DataFrame | None = None  # plays.csv sin tocar; lo usa la auditoria de modelos
+    audit: AuditCache = field(default_factory=AuditCache)
 
     def store(self, rec: Recommendation) -> None:
         with self.lock:
@@ -80,6 +83,7 @@ def build_state(data_dir: Path, seed: int = SEED) -> AppState:
         vocab=pm.vocab if pm else {}, candidates=candidates,
         findings=reports.compute_findings(dataset, scouting, players),
         team_stats=team_stats, league_avg=league, teams=reports.list_teams(dataset),
+        plays=files["plays.csv"],
     )
     log.info("listo en %.1f s: %d jugadas de pase, %d candidatas", time.monotonic() - t0,
              len(dataset), len(candidates))

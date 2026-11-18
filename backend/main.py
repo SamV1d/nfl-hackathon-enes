@@ -25,6 +25,8 @@ from fastapi.staticfiles import StaticFiles  # noqa: E402
 from . import nova, reports, schemas  # noqa: E402
 from .config import PROJECT_ROOT, data_dir_from_env  # noqa: E402
 from .loader import StartupError  # noqa: E402
+from .ml.service import AuditUnavailable  # noqa: E402
+from .ml.validation import run_audit  # noqa: E402
 from .models import InvalidSituation, Situation  # noqa: E402
 from .recommender import PredictionUnavailable, recommend  # noqa: E402
 from .state import AppState, build_state  # noqa: E402
@@ -127,6 +129,16 @@ def create_app(data_dir: Path | None = None, static_dir: Path | None = None) -> 
         models_ready()
         return {"pressure_model": state.pressure_model.metrics(),
                 "yards_model": state.yards_model.metrics()}
+
+    @app.get("/api/model-audit")
+    def model_audit():
+        """Comparación de modelos con validación temporal por semana (ver docs/ML.md)."""
+        if state.plays is None:
+            raise HTTPException(503, "model audit unavailable")
+        try:
+            return state.audit.get(lambda: run_audit(state.dataset, state.plays, state.games))
+        except AuditUnavailable:
+            raise HTTPException(503, "model audit unavailable") from None
 
     @app.get("/api/games", response_model=list[schemas.GameOut])
     def games():
